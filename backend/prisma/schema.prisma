@@ -1,0 +1,146 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  APPROVER
+  EMPLOYEE
+}
+
+enum BookingStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  UNAVAILABLE
+}
+
+enum DriverStatus {
+  AVAILABLE
+  ON_DUTY
+  UNAVAILABLE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(EMPLOYEE)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings      Booking[]
+  approvals     Approval[]
+  createdBookings Booking[] @relation("CreatedBy")
+
+  @@map("users")
+}
+
+model Vehicle {
+  id          String        @id @default(uuid())
+  name        String
+  plateNumber String        @unique
+  type        String        // e.g., "Car", "Van", "Truck"
+  capacity    Int           // Number of passengers
+  status      VehicleStatus @default(AVAILABLE)
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  bookings Booking[]
+
+  @@map("vehicles")
+}
+
+model Driver {
+  id          String        @id @default(uuid())
+  name        String
+  phone       String        @unique
+  licenseNo   String        @unique
+  status      DriverStatus  @default(AVAILABLE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  bookings Booking[]
+
+  @@map("drivers")
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  title           String
+  purpose         String
+  startTime       DateTime
+  endTime         DateTime
+  pickupLocation  String
+  dropoffLocation String
+  passengerCount  Int
+  status          BookingStatus @default(DRAFT)
+
+  // Foreign Keys
+  userId          String
+  vehicleId       String?
+  driverId        String?
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?      @relation(fields: [vehicleId], references: [id])
+  driver          Driver?       @relation(fields: [driverId], references: [id])
+  approvals       Approval[]
+  createdBy       User          @relation("CreatedBy", fields: [createdById], references: [id])
+  createdById     String
+
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("bookings")
+}
+
+model Approval {
+  id          String         @id @default(uuid())
+  level       Int            // Approval level (1, 2, 3, etc.)
+  status      ApprovalStatus @default(PENDING)
+  comments    String?
+
+  // Foreign Keys
+  bookingId   String
+  approverId  String
+
+  // Relations
+  booking     Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  approver    User           @relation(fields: [approverId], references: [id])
+
+  reviewedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([bookingId, level])
+  @@map("approvals")
+}
